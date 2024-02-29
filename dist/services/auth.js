@@ -15,15 +15,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const user_1 = __importDefault(require("../models/user"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const verifyPassword = (password, email) => __awaiter(void 0, void 0, void 0, function* () {
-    const usuario = yield user_1.default.findOne({
-        email: email,
-    }).exec();
-    console.log(usuario);
-    if (!usuario) {
+    try {
+        const usuario = yield user_1.default.findOne({
+            email: email,
+        }).exec();
+        console.log(usuario);
+        if (!usuario || typeof usuario.password !== "string") {
+            return false;
+        }
+        const result = yield bcrypt_1.default.compare(password, usuario.password);
+        console.log(result);
+        return result;
+    }
+    catch (error) {
+        console.log(error);
         return false;
     }
-    const result = yield bcrypt_1.default.compare(password, usuario.password);
-    console.log(result);
-    return result;
 });
 exports.default = verifyPassword;

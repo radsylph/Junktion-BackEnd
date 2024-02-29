@@ -47,7 +47,7 @@ passport_1.default.use("signup", new passport_local_1.default.Strategy({
     passwordField: "password",
     passReqToCallback: true,
 }, (req, email, password, done) => __awaiter(void 0, void 0, void 0, function* () {
-    const { username } = req.body;
+    const { username, name, lastname } = req.body;
     try {
         const existingEmail = yield user_1.default.findOne({ email: email }).exec();
         if (existingEmail) {
@@ -55,7 +55,13 @@ passport_1.default.use("signup", new passport_local_1.default.Strategy({
                 message: "The email is already register",
             });
         }
-        const newUser = new user_1.default({ email, password, username });
+        const existingUsername = yield user_1.default.findOne({ username: username }).exec();
+        if (existingUsername) {
+            return done(null, false, {
+                message: "The username is already register",
+            });
+        }
+        const newUser = new user_1.default({ email, password, username, name, lastname });
         yield newUser.save();
         return done(null, newUser);
     }
@@ -66,10 +72,12 @@ passport_1.default.use("signup", new passport_local_1.default.Strategy({
 })));
 passport_1.default.use("login", new passport_local_1.default.Strategy({ usernameField: "email", passwordField: "password" }, (email, password, done) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const ExistingUser = yield user_1.default.findOne({ email: email }).exec();
+        const userInfo = email;
+        const ExistingUser = yield user_1.default.findOne({ $or: [{ email: userInfo }, { username: userInfo }] }).exec();
         if (!ExistingUser) {
-            return done(null, false, { message: "The email cannot be found" });
+            return done(null, false, { message: "The user can't be found" });
         }
+        console.log(password, ExistingUser.password);
         const validate = yield (0, auth_1.default)(password, ExistingUser.email);
         if (!validate) {
             return done(null, false, { message: "the password doesn't match" });

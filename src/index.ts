@@ -2,6 +2,7 @@ import express from "express"; // se importa express
 import cors from "cors"; // se importa cors para que no haya problemas de comunicacion entre otras plataformas
 
 import userRoutes from "./routes/users.route";
+import publicationRoutes from "./routes/publications.routes";
 import database from "./configs/mongo";
 import session from "express-session";
 import passport from "passport";
@@ -22,6 +23,7 @@ server.use(passport.initialize()); // se inicializa passport
 server.use(passport.session()); // se usa el middleware para que express pueda usar sesiones de passport
 
 server.use("/users", userRoutes); // se declaran las rutas para los usuarios
+server.use("/publications", publicationRoutes); // se declaran las rutas para las publicaciones
 
 try {
     database.on("error", (err) => {

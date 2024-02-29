@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express")); // se importa express
 const cors_1 = __importDefault(require("cors")); // se importa cors para que no haya problemas de comunicacion entre otras plataformas
 const users_route_1 = __importDefault(require("./routes/users.route"));
+const publications_routes_1 = __importDefault(require("./routes/publications.routes"));
 const mongo_1 = __importDefault(require("./configs/mongo"));
 const express_session_1 = __importDefault(require("express-session"));
 const passport_1 = __importDefault(require("passport"));
@@ -30,6 +31,7 @@ server.use((0, express_session_1.default)({ secret: secret, resave: true, saveUn
 server.use(passport_1.default.initialize()); // se inicializa passport
 server.use(passport_1.default.session()); // se usa el middleware para que express pueda usar sesiones de passport
 server.use("/users", users_route_1.default); // se declaran las rutas para los usuarios
+server.use("/publications", publications_routes_1.default); // se declaran las rutas para las publicaciones
 try {
     mongo_1.default.on("error", (err) => {
         console.error("Error de conexion a la base de datos:", err);
