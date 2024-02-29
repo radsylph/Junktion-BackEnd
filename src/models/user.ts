@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema<UserInterface>({
     username: { type: String, required: true, unique: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true, unique: false },
+    myFriends: { type: Number, required: false, unique: false }
 });
 
 UserSchema.pre("save", async function (next) {
