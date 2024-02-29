@@ -31,7 +31,6 @@ exports.createUser = createUser;
 const loginUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     yield passport_1.default.authenticate("login", (err, user, info) => {
         if (err) {
-            console.log(err);
             return res
                 .status(500)
                 .json({ message: "Internal server error", error: err });
