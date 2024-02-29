@@ -17,7 +17,7 @@ passport.use(
             passReqToCallback: true,
         },
         async (req, email, password, done) => {
-            const { username } = req.body;
+            const { username, name, lastname } = req.body;
             try {
                 const existingEmail = await User.findOne({ email: email }).exec();
                 if (existingEmail) {
@@ -25,7 +25,13 @@ passport.use(
                         message: "The email is already register",
                     });
                 }
-                const newUser = new User({ email, password, username });
+                const existingUsername = await User.findOne({ username: username }).exec();
+                if (existingUsername) {
+                    return done(null, false, {
+                        message: "The username is already register",
+                    });
+                }
+                const newUser = new User({ email, password, username, name, lastname });
                 await newUser.save();
                 return done(null, newUser);
             } catch (error) {
@@ -42,10 +48,12 @@ passport.use(
         { usernameField: "email", passwordField: "password" },
         async (email, password, done) => {
             try {
-                const ExistingUser = await User.findOne({ email: email }).exec();
+                const userInfo = email;
+                const ExistingUser = await User.findOne({ $or: [{ email: userInfo }, { username: userInfo }] }).exec();
                 if (!ExistingUser) {
-                    return done(null, false, { message: "The email cannot be found" });
+                    return done(null, false, { message: "The user can't be found" });
                 }
+                console.log(password, ExistingUser.password)
                 const validate = await verifyPassword(password, ExistingUser.email);
                 if (!validate) {
                     return done(null, false, { message: "the password doesn't match" });
