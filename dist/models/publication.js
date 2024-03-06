@@ -12,7 +12,9 @@ const publicationSchema = new mongoose_1.default.Schema({
     isEdited: { type: Boolean, required: true, unique: false, default: false },
     bookMark: { type: Boolean, required: true, unique: false, default: false },
     likes: { type: Number, required: true, unique: false, default: 0 },
-    comments: { type: Number, required: true, unique: false, default: 0 }
+    comments: { type: Number, required: true, unique: false, default: 0 },
+}, {
+    timestamps: true,
 });
 const Publication = mongoose_1.default.model("Publication", publicationSchema);
 exports.default = Publication;
