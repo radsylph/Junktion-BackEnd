@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { PublicationInterface } from "../interfaces/publication.interface";
 
 const publicationSchema = new mongoose.Schema<PublicationInterface>({
-    owner: { type: String, required: true, unique: false, refPath: "users" },
+    owner: { type: String, required: true, unique: false, ref: "User" },
     title: { type: String, required: true, unique: false },
     content: { type: String, required: true, unique: false },
     images: { type: [String], required: false, unique: false, default: [] },
