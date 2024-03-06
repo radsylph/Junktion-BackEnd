@@ -37,7 +37,6 @@ const likePublication = async (req: Request, res: Response) => {
     const token = req.headers.authorization?.split(" ")[1];
     const payload: any = decryptToken(token);
     try {
-
         const existingLike = await Like.findOne({
             userId: payload.user._id,
             publicationId,

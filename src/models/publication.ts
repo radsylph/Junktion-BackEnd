@@ -10,9 +10,11 @@ const publicationSchema = new mongoose.Schema<PublicationInterface>({
     isEdited: { type: Boolean, required: true, unique: false, default: false },
     bookMark: { type: Boolean, required: true, unique: false, default: false },
     likes: { type: Number, required: true, unique: false, default: 0 },
-    comments: { type: Number, required: true, unique: false, default: 0 }
-
-});
+    comments: { type: Number, required: true, unique: false, default: 0 },
+},
+    {
+        timestamps: true,
+    });
 
 const Publication = mongoose.model<PublicationInterface>("Publication", publicationSchema);
 
