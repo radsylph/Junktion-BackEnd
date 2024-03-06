@@ -44,7 +44,7 @@ const likePublication = async (req: Request, res: Response) => {
         if (existingLike) {
             await Like.findByIdAndDelete(existingLike._id);
             await Publication.findByIdAndUpdate(publicationId, { $inc: { likes: -1 } });
-            return res.status(200).json({ message: "Like removed" });
+            return res.status(200).json({ message: "Like removed", code: 200 });
 
         } else {
             const createLike = await Like.create({
@@ -53,7 +53,7 @@ const likePublication = async (req: Request, res: Response) => {
             });
             createLike.save();
             await Publication.findByIdAndUpdate(publicationId, { $inc: { likes: +1 } });
-            return res.status(200).json({ message: "Like created" });
+            return res.status(201).json({ message: "Like created", code: 201 });
         }
     } catch (error) {
         return res.status(500).json({ message: "Internal server error", error });
