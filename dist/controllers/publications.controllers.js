@@ -60,7 +60,7 @@ const likePublication = (req, res) => __awaiter(void 0, void 0, void 0, function
         if (existingLike) {
             yield like_1.default.findByIdAndDelete(existingLike._id);
             yield publication_1.default.findByIdAndUpdate(publicationId, { $inc: { likes: -1 } });
-            return res.status(200).json({ message: "Like removed" });
+            return res.status(200).json({ message: "Like removed", code: 200 });
         }
         else {
             const createLike = yield like_1.default.create({
@@ -69,7 +69,7 @@ const likePublication = (req, res) => __awaiter(void 0, void 0, void 0, function
             });
             createLike.save();
             yield publication_1.default.findByIdAndUpdate(publicationId, { $inc: { likes: +1 } });
-            return res.status(200).json({ message: "Like created" });
+            return res.status(201).json({ message: "Like created", code: 201 });
         }
     }
     catch (error) {
