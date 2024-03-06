@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const publicationSchema = new mongoose_1.default.Schema({
-    owner: { type: String, required: true, unique: false, refPath: "users" },
+    owner: { type: String, required: true, unique: false, ref: "User" },
     title: { type: String, required: true, unique: false },
     content: { type: String, required: true, unique: false },
     images: { type: [String], required: false, unique: false, default: [] },
