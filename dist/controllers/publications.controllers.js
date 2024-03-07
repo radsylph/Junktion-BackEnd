@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserPublications = exports.deletePublication = exports.editPublication = exports.likePublication = exports.getPublications = exports.createPublication = void 0;
+exports.getLikesPublication = exports.getLikes = exports.getUserPublications = exports.deletePublication = exports.editPublication = exports.likePublication = exports.getPublications = exports.createPublication = void 0;
 const publication_1 = __importDefault(require("../models/publication"));
 const like_1 = __importDefault(require("../models/like"));
 const jwt_1 = require("../utils/jwt");
@@ -52,6 +52,7 @@ const likePublication = (req, res) => __awaiter(void 0, void 0, void 0, function
     const { publicationId } = req.params;
     const token = (_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(" ")[1];
     const payload = (0, jwt_1.decryptToken)(token);
+    let isLiked = false;
     try {
         const existingLike = yield like_1.default.findOne({
             userId: payload.user._id,
@@ -59,8 +60,9 @@ const likePublication = (req, res) => __awaiter(void 0, void 0, void 0, function
         });
         if (existingLike) {
             yield like_1.default.findByIdAndDelete(existingLike._id);
-            yield publication_1.default.findByIdAndUpdate(publicationId, { $inc: { likes: -1 } });
-            return res.status(200).json({ message: "Like removed", code: 200 });
+            const likedPublication = yield publication_1.default.findByIdAndUpdate(publicationId, { $inc: { likes: -1 }, $set: { Isliked: false } });
+            isLiked = false;
+            return res.status(200).json({ message: "Like removed", code: 200, isLiked });
         }
         else {
             const createLike = yield like_1.default.create({
@@ -68,8 +70,9 @@ const likePublication = (req, res) => __awaiter(void 0, void 0, void 0, function
                 publicationId,
             });
             createLike.save();
-            yield publication_1.default.findByIdAndUpdate(publicationId, { $inc: { likes: +1 } });
-            return res.status(201).json({ message: "Like created", code: 201 });
+            yield publication_1.default.findByIdAndUpdate(publicationId, { $inc: { likes: +1 }, $set: { isLiked: true } });
+            isLiked = true;
+            return res.status(201).json({ message: "Like created", code: 201, isLiked });
         }
     }
     catch (error) {
@@ -77,6 +80,27 @@ const likePublication = (req, res) => __awaiter(void 0, void 0, void 0, function
     }
 });
 exports.likePublication = likePublication;
+const getLikesPublication = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { publicationId } = req.params;
+    try {
+        const likes = yield like_1.default.find({ publicationId });
+        return res.status(200).json({ message: "Likes find", likes });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.getLikesPublication = getLikesPublication;
+const getLikes = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const likes = yield like_1.default.find({});
+        return res.status(200).json({ message: "Likes find", likes });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.getLikes = getLikes;
 const editPublication = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _c;
     const { publicationId } = req.params;

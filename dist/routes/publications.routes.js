@@ -12,4 +12,6 @@ router.post("/create", passport_1.default.authenticate("jwt", { session: false }
 router.patch("/like/:publicationId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.likePublication);
 router.put("/edit/:publicationId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.editPublication);
 router.get("/get/:userId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getUserPublications);
+router.get("/like/:publicationId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getLikesPublication);
+router.get("/like", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getLikes);
 exports.default = router;
