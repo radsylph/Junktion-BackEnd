@@ -7,4 +7,5 @@ export interface PublicationInterface {
     bookMark: boolean;
     likes: number;
     comments: number;
+
 }

@@ -4,6 +4,7 @@ export default interface UserInterface {
     username: string;
     password: string;
     email: string;
+    profilePicture: string;
     myFriends: number;
     verifyPassword: (password: string) => Promise<boolean>;
 }
