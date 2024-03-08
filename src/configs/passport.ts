@@ -17,7 +17,7 @@ passport.use(
             passReqToCallback: true,
         },
         async (req, email, password, done) => {
-            const { username, name, lastname } = req.body;
+            const { username, name, lastname, profilePicture } = req.body;
             try {
                 const existingEmail = await User.findOne({ email: email }).exec();
                 if (existingEmail) {
@@ -31,7 +31,7 @@ passport.use(
                         message: "The username is already register",
                     });
                 }
-                const newUser = new User({ email, password, username, name, lastname });
+                const newUser = new User({ email, password, username, name, lastname, profilePicture });
                 await newUser.save();
                 return done(null, newUser);
             } catch (error) {
