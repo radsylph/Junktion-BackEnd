@@ -4,8 +4,9 @@ import {
     getPublications,
     likePublication,
     editPublication,
-    getUserPublications
-
+    getUserPublications,
+    getLikes,
+    getLikesPublication
 } from "../controllers/publications.controllers";
 import passport from "passport";
 
@@ -20,5 +21,7 @@ router.post(
 router.patch("/like/:publicationId", passport.authenticate("jwt", { session: false }), likePublication)
 router.put("/edit/:publicationId", passport.authenticate("jwt", { session: false }), editPublication)
 router.get("/get/:userId", passport.authenticate("jwt", { session: false }), getUserPublications)
+router.get("/like/:publicationId", passport.authenticate("jwt", { session: false }), getLikesPublication)
+router.get("/like", passport.authenticate("jwt", { session: false }), getLikes)
 
 export default router;
