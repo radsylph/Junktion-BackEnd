@@ -47,7 +47,7 @@ passport_1.default.use("signup", new passport_local_1.default.Strategy({
     passwordField: "password",
     passReqToCallback: true,
 }, (req, email, password, done) => __awaiter(void 0, void 0, void 0, function* () {
-    const { username, name, lastname } = req.body;
+    const { username, name, lastname, profilePicture } = req.body;
     try {
         const existingEmail = yield user_1.default.findOne({ email: email }).exec();
         if (existingEmail) {
@@ -61,7 +61,7 @@ passport_1.default.use("signup", new passport_local_1.default.Strategy({
                 message: "The username is already register",
             });
         }
-        const newUser = new user_1.default({ email, password, username, name, lastname });
+        const newUser = new user_1.default({ email, password, username, name, lastname, profilePicture });
         yield newUser.save();
         return done(null, newUser);
     }
