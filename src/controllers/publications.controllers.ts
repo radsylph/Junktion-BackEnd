@@ -36,6 +36,7 @@ const likePublication = async (req: Request, res: Response) => {
     const { publicationId } = req.params;
     const token = req.headers.authorization?.split(" ")[1];
     const payload: any = decryptToken(token);
+    let isLiked = false;
     try {
         const existingLike = await Like.findOne({
             userId: payload.user._id,
@@ -43,8 +44,10 @@ const likePublication = async (req: Request, res: Response) => {
         });
         if (existingLike) {
             await Like.findByIdAndDelete(existingLike._id);
-            await Publication.findByIdAndUpdate(publicationId, { $inc: { likes: -1 } });
-            return res.status(200).json({ message: "Like removed", code: 200 });
+            const likedPublication = await Publication.findByIdAndUpdate(publicationId, { $inc: { likes: -1 }, $set: { Isliked: false } });
+
+            isLiked = false;
+            return res.status(200).json({ message: "Like removed", code: 200, isLiked });
 
         } else {
             const createLike = await Like.create({
@@ -52,9 +55,29 @@ const likePublication = async (req: Request, res: Response) => {
                 publicationId,
             });
             createLike.save();
-            await Publication.findByIdAndUpdate(publicationId, { $inc: { likes: +1 } });
-            return res.status(201).json({ message: "Like created", code: 201 });
+            await Publication.findByIdAndUpdate(publicationId, { $inc: { likes: +1 }, $set: { isLiked: true } });
+            isLiked = true;
+            return res.status(201).json({ message: "Like created", code: 201, isLiked });
         }
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+
+const getLikesPublication = async (req: Request, res: Response) => {
+    const { publicationId } = req.params;
+    try {
+        const likes = await Like.find({ publicationId });
+        return res.status(200).json({ message: "Likes find", likes });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+
+const getLikes = async (req: Request, res: Response) => {
+    try {
+        const likes = await Like.find({});
+        return res.status(200).json({ message: "Likes find", likes });
     } catch (error) {
         return res.status(500).json({ message: "Internal server error", error });
     }
@@ -123,7 +146,4 @@ const getUserPublications = async (req: Request, res: Response) => {
 
 }
 
-
-
-
-export { createPublication, getPublications, likePublication, editPublication, deletePublication, getUserPublications }
+export { createPublication, getPublications, likePublication, editPublication, deletePublication, getUserPublications, getLikes, getLikesPublication }
