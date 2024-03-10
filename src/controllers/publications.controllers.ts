@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import Publication from "../models/publication";
 import Like from "../models/like";
+import BookMark from "../models/bookMark";
 import { decryptToken } from "../utils/jwt";
 
 const createPublication = async (req: Request, res: Response) => {
@@ -9,7 +10,6 @@ const createPublication = async (req: Request, res: Response) => {
     const payload: any = decryptToken(token);
     //const owner = payload.user._id;
     try {
-
         const publication = await Publication.create({
             owner: payload.user._id,
             title,
@@ -38,6 +38,10 @@ const likePublication = async (req: Request, res: Response) => {
     const payload: any = decryptToken(token);
     let isLiked = false;
     try {
+        const existingPublication = await Publication.findById(publicationId);
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
         const existingLike = await Like.findOne({
             userId: payload.user._id,
             publicationId,
@@ -45,10 +49,8 @@ const likePublication = async (req: Request, res: Response) => {
         if (existingLike) {
             await Like.findByIdAndDelete(existingLike._id);
             const likedPublication = await Publication.findByIdAndUpdate(publicationId, { $inc: { likes: -1 }, $set: { Isliked: false } });
-
             isLiked = false;
             return res.status(200).json({ message: "Like removed", code: 200, isLiked });
-
         } else {
             const createLike = await Like.create({
                 userId: payload.user._id,
@@ -81,6 +83,79 @@ const getLikes = async (req: Request, res: Response) => {
     } catch (error) {
         return res.status(500).json({ message: "Internal server error", error });
     }
+}
+
+const bookMarkPublication = async (req: Request, res: Response) => {
+    const { postId } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    let bookMark = false;
+    try {
+        const existingPublication = await Publication.find({ _id: postId }).populate("owner").exec();
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
+        const existingBookMark = await BookMark.findOne({
+            userId: payload.user._id,
+            publicationId: postId,
+        });
+        if (existingBookMark) {
+            await BookMark.findByIdAndDelete(existingBookMark._id);
+            bookMark = false;
+            return res.status(200).json({ message: "Bookmark removed", code: 200, bookMark });
+        } else {
+            const bookmarkedPublication = await BookMark.create({
+                userId: payload.user._id,
+                publicationId: postId,
+            });
+            (await bookmarkedPublication.save()).populate("publicationId", "userId");
+            bookMark = true;
+            return res.status(201).json({ message: "Bookmark created", code: 201, bookMark });
+        }
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+
+const getBookMarks = async (req: Request, res: Response) => {
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    try {
+        const bookmarks = await BookMark.find().exec();
+        return res.status(200).json({ message: "Bookmarks find", bookmarks });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+
+const getMyBookMarks = async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    try {
+        const bookmarks = await BookMark.find({ userId })
+            .populate({ path: "publicationId", populate: { path: "owner" } })
+            .exec();
+        const bookmarkPublication = bookmarks.map((bookmark) => bookmark.publicationId);
+        if (!bookmarks) {
+            return res.status(404).json({ message: "Bookmarks not found" });
+        }
+        return res.status(200).json({ message: "Bookmark publications found", bookmarkPublication });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+
+    }
+}
+
+const getBookMarksPublication = async (req: Request, res: Response) => {
+    const { publicationId } = req.params;
+    try {
+        const bookmarks = await BookMark.find({ publicationId }).populate("userId").exec();
+        return res.status(200).json({ message: "Bookmarks find", bookmarks });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+
 }
 
 const editPublication = async (req: Request, res: Response) => {
@@ -122,6 +197,7 @@ const deletePublication = async (req: Request, res: Response) => {
             return res.status(401).json({ message: "You are not the owner of this publication" })
         }
         await Like.deleteMany({ publicationId });
+        await BookMark.deleteMany({ publicationId });
         await Publication.findByIdAndDelete(publicationId);
         return res.status(200).json({ message: "Publication deleted" });
     } catch (error) {
@@ -146,4 +222,4 @@ const getUserPublications = async (req: Request, res: Response) => {
 
 }
 
-export { createPublication, getPublications, likePublication, editPublication, deletePublication, getUserPublications, getLikes, getLikesPublication }
+export { createPublication, getPublications, likePublication, editPublication, deletePublication, getUserPublications, getLikes, getLikesPublication, bookMarkPublication, getBookMarks, getBookMarksPublication, getMyBookMarks }
