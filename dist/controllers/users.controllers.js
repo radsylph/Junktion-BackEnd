@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUser = exports.deleteUser = exports.EditUser = exports.test2 = exports.test = exports.loginUser = exports.createUser = void 0;
+exports.changePassword = exports.getUser = exports.deleteUser = exports.EditUser = exports.loginUser = exports.createUser = void 0;
 const passport_1 = __importDefault(require("../configs/passport"));
 const user_1 = __importDefault(require("../models/user"));
 const jwt_1 = require("../utils/jwt");
@@ -76,7 +76,7 @@ const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 exports.deleteUser = deleteUser;
 const EditUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _b;
-    const { email, username, password } = req.body;
+    const { email, username, password, name, lastname, profilePicture } = req.body;
     const token = (_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(" ")[1];
     const payload = (0, jwt_1.decryptToken)(token);
     try {
@@ -107,6 +107,9 @@ const EditUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         currentUser.email = email;
         currentUser.username = username;
         currentUser.password = password;
+        currentUser.name = name;
+        currentUser.lastname = lastname;
+        currentUser.profilePicture = profilePicture;
         yield currentUser.save();
         return res.json({ message: "User edited", currentUser });
     }
@@ -117,28 +120,35 @@ const EditUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.EditUser = EditUser;
-const test = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const changePassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _c;
+    const { newPassword } = req.body;
+    console.log(req.body);
     const token = (_c = req.headers.authorization) === null || _c === void 0 ? void 0 : _c.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
     try {
-        const userId = (0, jwt_1.decryptToken)(token);
-        const userFound = yield user_1.default.findById(userId.user._id).exec();
-        return res.json({
-            message: "testing",
-            token: token,
-            user: userFound,
-            userId,
-        });
+        const currentUser = yield user_1.default.findById(payload.user._id).exec();
+        if (!currentUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        if (currentUser._id != payload.user._id) {
+            return res.status(401).json({
+                message: "You can't edit this user",
+                CurrentUser: currentUser._id,
+                payload: payload.user._id,
+            });
+        }
+        currentUser.password = newPassword;
+        yield currentUser.save();
+        return res.json({ message: "Password changed", currentUser });
     }
     catch (error) {
-        return res.status(404).json({ message: "User not found", error: error });
+        return res
+            .status(500)
+            .json({ message: "Internal server error", error: error });
     }
 });
-exports.test = test;
-const test2 = (req, res) => {
-    return res.json({ message: "testing" });
-};
-exports.test2 = test2;
+exports.changePassword = changePassword;
 const getUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _d;
     const token = (_d = req.headers.authorization) === null || _d === void 0 ? void 0 : _d.split(" ")[1];

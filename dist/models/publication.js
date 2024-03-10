@@ -10,7 +10,6 @@ const publicationSchema = new mongoose_1.default.Schema({
     content: { type: String, required: true, unique: false },
     images: { type: [String], required: false, unique: false, default: [] },
     isEdited: { type: Boolean, required: true, unique: false, default: false },
-    bookMark: { type: Boolean, required: true, unique: false, default: false },
     likes: { type: Number, required: true, unique: false, default: 0 },
     comments: { type: Number, required: true, unique: false, default: 0 },
 }, {

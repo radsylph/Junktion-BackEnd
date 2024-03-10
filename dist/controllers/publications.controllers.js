@@ -12,9 +12,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getLikesPublication = exports.getLikes = exports.getUserPublications = exports.deletePublication = exports.editPublication = exports.likePublication = exports.getPublications = exports.createPublication = void 0;
+exports.getMyBookMarks = exports.getBookMarksPublication = exports.getBookMarks = exports.bookMarkPublication = exports.getLikesPublication = exports.getLikes = exports.getUserPublications = exports.deletePublication = exports.editPublication = exports.likePublication = exports.getPublications = exports.createPublication = void 0;
 const publication_1 = __importDefault(require("../models/publication"));
 const like_1 = __importDefault(require("../models/like"));
+const bookMark_1 = __importDefault(require("../models/bookMark"));
 const jwt_1 = require("../utils/jwt");
 const createPublication = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -54,6 +55,10 @@ const likePublication = (req, res) => __awaiter(void 0, void 0, void 0, function
     const payload = (0, jwt_1.decryptToken)(token);
     let isLiked = false;
     try {
+        const existingPublication = yield publication_1.default.findById(publicationId);
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
         const existingLike = yield like_1.default.findOne({
             userId: payload.user._id,
             publicationId,
@@ -101,10 +106,89 @@ const getLikes = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.getLikes = getLikes;
-const editPublication = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const bookMarkPublication = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _c;
-    const { publicationId } = req.params;
+    const { postId } = req.params;
     const token = (_c = req.headers.authorization) === null || _c === void 0 ? void 0 : _c.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
+    let bookMark = false;
+    try {
+        const existingPublication = yield publication_1.default.find({ _id: postId }).populate("owner").exec();
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
+        const existingBookMark = yield bookMark_1.default.findOne({
+            userId: payload.user._id,
+            publicationId: postId,
+        });
+        if (existingBookMark) {
+            yield bookMark_1.default.findByIdAndDelete(existingBookMark._id);
+            bookMark = false;
+            return res.status(200).json({ message: "Bookmark removed", code: 200, bookMark });
+        }
+        else {
+            const bookmarkedPublication = yield bookMark_1.default.create({
+                userId: payload.user._id,
+                publicationId: postId,
+            });
+            (yield bookmarkedPublication.save()).populate("publicationId", "userId");
+            bookMark = true;
+            return res.status(201).json({ message: "Bookmark created", code: 201, bookMark });
+        }
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.bookMarkPublication = bookMarkPublication;
+const getBookMarks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _d;
+    const token = (_d = req.headers.authorization) === null || _d === void 0 ? void 0 : _d.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
+    try {
+        const bookmarks = yield bookMark_1.default.find().exec();
+        return res.status(200).json({ message: "Bookmarks find", bookmarks });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.getBookMarks = getBookMarks;
+const getMyBookMarks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _e;
+    const { userId } = req.params;
+    const token = (_e = req.headers.authorization) === null || _e === void 0 ? void 0 : _e.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
+    try {
+        const bookmarks = yield bookMark_1.default.find({ userId })
+            .populate({ path: "publicationId", populate: { path: "owner" } })
+            .exec();
+        const bookmarkPublication = bookmarks.map((bookmark) => bookmark.publicationId);
+        if (!bookmarks) {
+            return res.status(404).json({ message: "Bookmarks not found" });
+        }
+        return res.status(200).json({ message: "Bookmark publications found", bookmarkPublication });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.getMyBookMarks = getMyBookMarks;
+const getBookMarksPublication = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { publicationId } = req.params;
+    try {
+        const bookmarks = yield bookMark_1.default.find({ publicationId }).populate("userId").exec();
+        return res.status(200).json({ message: "Bookmarks find", bookmarks });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.getBookMarksPublication = getBookMarksPublication;
+const editPublication = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _f;
+    const { publicationId } = req.params;
+    const token = (_f = req.headers.authorization) === null || _f === void 0 ? void 0 : _f.split(" ")[1];
     const payload = (0, jwt_1.decryptToken)(token);
     const { title, content, images } = req.body;
     try {
@@ -129,9 +213,9 @@ const editPublication = (req, res) => __awaiter(void 0, void 0, void 0, function
 });
 exports.editPublication = editPublication;
 const deletePublication = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _d;
+    var _g;
     const { publicationId } = req.params;
-    const token = (_d = req.headers.authorization) === null || _d === void 0 ? void 0 : _d.split(" ")[1];
+    const token = (_g = req.headers.authorization) === null || _g === void 0 ? void 0 : _g.split(" ")[1];
     const payload = (0, jwt_1.decryptToken)(token);
     try {
         const existingPublication = yield publication_1.default.findById(publicationId);
@@ -142,6 +226,7 @@ const deletePublication = (req, res) => __awaiter(void 0, void 0, void 0, functi
             return res.status(401).json({ message: "You are not the owner of this publication" });
         }
         yield like_1.default.deleteMany({ publicationId });
+        yield bookMark_1.default.deleteMany({ publicationId });
         yield publication_1.default.findByIdAndDelete(publicationId);
         return res.status(200).json({ message: "Publication deleted" });
     }
@@ -151,9 +236,9 @@ const deletePublication = (req, res) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.deletePublication = deletePublication;
 const getUserPublications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _e;
+    var _h;
     const { userId } = req.params;
-    const token = (_e = req.headers.authorization) === null || _e === void 0 ? void 0 : _e.split(" ")[1];
+    const token = (_h = req.headers.authorization) === null || _h === void 0 ? void 0 : _h.split(" ")[1];
     const payload = (0, jwt_1.decryptToken)(token);
     try {
         const existingPublications = yield publication_1.default.find({ owner: userId }).populate("owner").exec();
