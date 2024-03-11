@@ -2,7 +2,10 @@ import { Request, Response, NextFunction } from "express";
 import Publication from "../models/publication";
 import Like from "../models/like";
 import BookMark from "../models/bookMark";
+import Friend from "../models/friend";
+import FriendRequest from "../models/friendRequest";
 import { decryptToken } from "../utils/jwt";
+import User from "../models/user";
 
 const createPublication = async (req: Request, res: Response) => {
     const { title, content, images } = req.body;
@@ -22,7 +25,6 @@ const createPublication = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error", error });
     }
 };
-
 const getPublications = async (req: Request, res: Response) => {
     try {
         const publications = await Publication.find().populate("owner").exec();
@@ -31,7 +33,15 @@ const getPublications = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error", error });
     }
 };
-
+const getPublication = async (req: Request, res: Response) => {
+    try {
+        const { publicationId } = req.params
+        const publication = await Publication.findById(publicationId).populate("owner").exec();
+        return res.status(200).json({ message: "Publications find", publication });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
 const likePublication = async (req: Request, res: Response) => {
     const { publicationId } = req.params;
     const token = req.headers.authorization?.split(" ")[1];
@@ -65,7 +75,6 @@ const likePublication = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error", error });
     }
 }
-
 const getLikesPublication = async (req: Request, res: Response) => {
     const { publicationId } = req.params;
     try {
@@ -75,7 +84,6 @@ const getLikesPublication = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error", error });
     }
 }
-
 const getLikes = async (req: Request, res: Response) => {
     try {
         const likes = await Like.find({});
@@ -84,7 +92,6 @@ const getLikes = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error", error });
     }
 }
-
 const bookMarkPublication = async (req: Request, res: Response) => {
     const { postId } = req.params;
     const token = req.headers.authorization?.split(" ")[1];
@@ -116,7 +123,6 @@ const bookMarkPublication = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error", error });
     }
 }
-
 const getBookMarks = async (req: Request, res: Response) => {
     const token = req.headers.authorization?.split(" ")[1];
     const payload: any = decryptToken(token);
@@ -127,7 +133,6 @@ const getBookMarks = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error", error });
     }
 }
-
 const getMyBookMarks = async (req: Request, res: Response) => {
     const { userId } = req.params;
     const token = req.headers.authorization?.split(" ")[1];
@@ -146,7 +151,6 @@ const getMyBookMarks = async (req: Request, res: Response) => {
 
     }
 }
-
 const getBookMarksPublication = async (req: Request, res: Response) => {
     const { publicationId } = req.params;
     try {
@@ -157,7 +161,6 @@ const getBookMarksPublication = async (req: Request, res: Response) => {
     }
 
 }
-
 const editPublication = async (req: Request, res: Response) => {
     const { publicationId } = req.params;
     const token = req.headers.authorization?.split(" ")[1];
@@ -183,7 +186,6 @@ const editPublication = async (req: Request, res: Response) => {
     }
 
 }
-
 const deletePublication = async (req: Request, res: Response) => {
     const { publicationId } = req.params;
     const token = req.headers.authorization?.split(" ")[1];
@@ -204,7 +206,6 @@ const deletePublication = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Internal server error", error });
     }
 }
-
 const getUserPublications = async (req: Request, res: Response) => {
     const { userId } = req.params;
     const token = req.headers.authorization?.split(" ")[1];
@@ -221,5 +222,122 @@ const getUserPublications = async (req: Request, res: Response) => {
     }
 
 }
+const sendFriendRequest = async (req: Request, res: Response) => {
+    const { receiver } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    const sender = payload.user._id;
+    try {
+        const existingFriendRequest = await FriendRequest.findOne({ sender, receiver });
+        if (existingFriendRequest) {
+            const friendRequestRemove = await FriendRequest.findByIdAndDelete(existingFriendRequest._id);
+            return res.status(200).json({ message: "Friend request removed", friendRequestRemove });
+        }
+        const friendRequest = await FriendRequest.create({ sender, receiver, status: "pending" });
+        friendRequest.save();
+        return res.status(201).json({ message: "Friend request sent", friendRequest });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const acceptFriendRequest = async (req: Request, res: Response) => {
+    const { sender } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    const receiver = payload.user._id;
+    try {
+        const existingFriendRequest = await FriendRequest.findOne({ sender, receiver });
+        if (!existingFriendRequest) {
+            return res.status(404).json({ message: "Friend request not found" });
+        }
+        const friend = await Friend.create({ mySelf: receiver, myFriend: sender });
+        friend.save();
+        const friendRequest = await FriendRequest.findByIdAndDelete(existingFriendRequest._id);
+        const updateFriends1 = await User.findByIdAndUpdate(sender, { $inc: { myFriends: +1 } });
+        const updateFriends2 = await User.findByIdAndUpdate(receiver, { $inc: { myFriends: +1 } });
+        updateFriends1.save();
+        updateFriends2.save();
+        return res.status(200).json({ message: "Friend request accepted", friendRequest });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const rejectFriendRequest = async (req: Request, res: Response) => {
+    const { sender } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    const receiver = payload.user._id;
+    try {
+        const existingFriendRequest = await FriendRequest.findOne({ sender, receiver });
+        if (!existingFriendRequest) {
+            return res.status(404).json({ message: "Friend request not found" });
+        }
+        const friendRequest = await FriendRequest.findByIdAndDelete(existingFriendRequest._id);
+        return res.status(200).json({ message: "Friend request rejected", friendRequest });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const deleteFriend = async (req: Request, res: Response) => {
+    const { friendId } = req.params;
+    try {
+        const existingFriend = await Friend.findByIdAndDelete(friendId);
+        if (!existingFriend) {
+            return res.status(404).json({ message: "Friend not found" });
+        }
+        return res.status(200).json({ message: "Friend deleted", existingFriend });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const getMyFriends = async (req: Request, res: Response) => {
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    const mySelf = payload.user._id;
+    try {
+        const friends = await Friend.find({ mySelf }).populate("myFriend").exec();
+        return res.status(200).json({ message: "Friends find", friends });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const getFriendsRequest = async (req: Request, res: Response) => {
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    const mySelf = payload.user._id;
+    try {
+        const friendsRequest = await FriendRequest.find({ receiver: mySelf }).populate("sender").exec();
+        return res.status(200).json({ message: "Friends request find", friendsRequest });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const getFriendsPublications = async (req: Request, res: Response) => {
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    const mySelf = payload.user._id;
+    try {
+        const friends = await Friend.find({
+            mySelf,
+        }).exec();
+        const friendsIds = await User.find({ _id: { $in: friends.map((friend) => friend.myFriend) } });
+        const friendsPublications = await Publication.find({ owner: { $in: friendsIds.map((friend) => friend._id) } }).populate("owner").exec();
+        return res.status(200).json({ message: "Friends publications find", friendsPublications });
 
-export { createPublication, getPublications, likePublication, editPublication, deletePublication, getUserPublications, getLikes, getLikesPublication, bookMarkPublication, getBookMarks, getBookMarksPublication, getMyBookMarks }
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const getFriends = async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    try {
+        const userFriends = await Friend.find({ mySelf: userId }).populate("myFriend").exec();
+        return res.status(200).json({ message: "Friends find", userFriends });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+
+}
+
+
+export { createPublication, getPublications, likePublication, editPublication, deletePublication, getUserPublications, getLikes, getLikesPublication, bookMarkPublication, getBookMarks, getBookMarksPublication, getMyBookMarks, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, deleteFriend, getFriendsRequest, getMyFriends, getFriendsPublications, getPublication, getFriends }
