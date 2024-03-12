@@ -15,8 +15,8 @@ router.patch("/like/:publicationId", passport_1.default.authenticate("jwt", { se
 router.put("/edit/:publicationId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.editPublication);
 router.get("/getAll/:userId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getUserPublications);
 router.get("/like/:publicationId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getLikesPublication);
-router.get("/like", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getLikes),
-    router.patch("/bookmark/:postId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.bookMarkPublication);
+router.get("/like", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getLikes);
+router.patch("/bookmark/:postId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.bookMarkPublication);
 router.get("/bookmark", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getBookMarks);
 router.get("/bookmark/:postId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getBookMarksPublication);
 router.get("/:userId/bookmark", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getMyBookMarks);
@@ -24,8 +24,11 @@ router.get("/getFriendRequests", passport_1.default.authenticate("jwt", { sessio
 router.post("/sendFriendRequest/:receiver", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.sendFriendRequest);
 router.post("/acceptFriendRequest/:sender", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.acceptFriendRequest);
 router.post("/rejectFriendRequest/:sender", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.rejectFriendRequest);
-//router.get("/getFriendRequests", passport.authenticate("jwt", { session: false }), getFriendsRequest);
 router.get("/getFriendsPublications", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getFriendsPublications);
 router.get("/getFriends/:userId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getFriends);
-router.delete("/deleteFriend/:friendId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.deleteFriend);
+router.delete("/deleteFriend/:myFriend", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.deleteFriend);
+router.post("/makeComment/:publicationId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.makeComment);
+router.get("/getComments/:publicationId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.getComments);
+router.put("/editComment/:commentId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.editComment);
+router.delete("/deleteComment/:commentId", passport_1.default.authenticate("jwt", { session: false }), publications_controllers_1.deleteComment);
 exports.default = router;

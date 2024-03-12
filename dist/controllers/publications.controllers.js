@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getFriends = exports.getPublication = exports.getFriendsPublications = exports.getMyFriends = exports.getFriendsRequest = exports.deleteFriend = exports.rejectFriendRequest = exports.acceptFriendRequest = exports.sendFriendRequest = exports.getMyBookMarks = exports.getBookMarksPublication = exports.getBookMarks = exports.bookMarkPublication = exports.getLikesPublication = exports.getLikes = exports.getUserPublications = exports.deletePublication = exports.editPublication = exports.likePublication = exports.getPublications = exports.createPublication = void 0;
+exports.deleteComment = exports.editComment = exports.getComments = exports.makeComment = exports.getFriends = exports.getPublication = exports.getFriendsPublications = exports.getMyFriends = exports.getFriendsRequest = exports.deleteFriend = exports.rejectFriendRequest = exports.acceptFriendRequest = exports.sendFriendRequest = exports.getMyBookMarks = exports.getBookMarksPublication = exports.getBookMarks = exports.bookMarkPublication = exports.getLikesPublication = exports.getLikes = exports.getUserPublications = exports.deletePublication = exports.editPublication = exports.likePublication = exports.getPublications = exports.createPublication = void 0;
 const publication_1 = __importDefault(require("../models/publication"));
 const like_1 = __importDefault(require("../models/like"));
 const bookMark_1 = __importDefault(require("../models/bookMark"));
@@ -43,7 +43,7 @@ const createPublication = (req, res) => __awaiter(void 0, void 0, void 0, functi
 exports.createPublication = createPublication;
 const getPublications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const publications = yield publication_1.default.find().populate("owner").exec();
+        const publications = yield publication_1.default.find({ isComment: false }).populate("owner").exec();
         return res.status(200).json({ message: "Publications find", publications });
     }
     catch (error) {
@@ -239,6 +239,14 @@ const deletePublication = (req, res) => __awaiter(void 0, void 0, void 0, functi
         if (existingPublication.owner !== payload.user._id) {
             return res.status(401).json({ message: "You are not the owner of this publication" });
         }
+        const comments = yield publication_1.default.find({ commentTo: publicationId });
+        if (comments) {
+            comments.forEach((comment) => __awaiter(void 0, void 0, void 0, function* () {
+                yield like_1.default.deleteMany({ commentId: comment._id });
+                yield bookMark_1.default.deleteMany({ commentId: comment._id });
+                yield publication_1.default.findByIdAndDelete(comment._id);
+            }));
+        }
         yield like_1.default.deleteMany({ publicationId });
         yield bookMark_1.default.deleteMany({ publicationId });
         yield publication_1.default.findByIdAndDelete(publicationId);
@@ -298,13 +306,11 @@ const acceptFriendRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
         if (!existingFriendRequest) {
             return res.status(404).json({ message: "Friend request not found" });
         }
-        const friend = yield friend_1.default.create({ mySelf: receiver, myFriend: sender });
-        friend.save();
+        const friend = (yield friend_1.default.create({ mySelf: receiver, myFriend: sender })).save();
+        const friend2 = (yield friend_1.default.create({ mySelf: sender, myFriend: receiver })).save();
         const friendRequest = yield friendRequest_1.default.findByIdAndDelete(existingFriendRequest._id);
-        const updateFriends1 = yield user_1.default.findByIdAndUpdate(sender, { $inc: { myFriends: +1 } });
-        const updateFriends2 = yield user_1.default.findByIdAndUpdate(receiver, { $inc: { myFriends: +1 } });
-        updateFriends1.save();
-        updateFriends2.save();
+        const updateFriends1 = (yield user_1.default.findByIdAndUpdate(sender, { $inc: { myFriends: +1 } })).save();
+        const updateFriends2 = (yield user_1.default.findByIdAndUpdate(receiver, { $inc: { myFriends: +1 } })).save();
         return res.status(200).json({ message: "Friend request accepted", friendRequest });
     }
     catch (error) {
@@ -332,13 +338,25 @@ const rejectFriendRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
 });
 exports.rejectFriendRequest = rejectFriendRequest;
 const deleteFriend = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { friendId } = req.params;
+    var _m;
+    const { myFriend } = req.params;
+    const token = (_m = req.headers.authorization) === null || _m === void 0 ? void 0 : _m.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
+    const mySelf = payload.user._id;
     try {
-        const existingFriend = yield friend_1.default.findByIdAndDelete(friendId);
-        if (!existingFriend) {
+        const existingFriend1 = yield friend_1.default.findOne({ mySelf, myFriend });
+        const existingFriend2 = yield friend_1.default.findOne({ mySelf: myFriend, myFriend: mySelf });
+        if (!existingFriend1 || !existingFriend2) {
             return res.status(404).json({ message: "Friend not found" });
         }
-        return res.status(200).json({ message: "Friend deleted", existingFriend });
+        const updateFriends1 = yield user_1.default.findByIdAndUpdate(mySelf, { $inc: { myFriends: -1 } });
+        const updateFriends2 = yield user_1.default.findByIdAndUpdate(myFriend, { $inc: { myFriends: -1 } });
+        if (!updateFriends1 || !updateFriends2) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const deletedFriendship1 = yield friend_1.default.findByIdAndDelete(existingFriend1._id);
+        const deletedFriendship2 = yield friend_1.default.findByIdAndDelete(existingFriend2._id);
+        return res.status(200).json({ message: "FriendShip deleted", });
     }
     catch (error) {
         return res.status(500).json({ message: "Internal server error", error });
@@ -346,8 +364,8 @@ const deleteFriend = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.deleteFriend = deleteFriend;
 const getMyFriends = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _m;
-    const token = (_m = req.headers.authorization) === null || _m === void 0 ? void 0 : _m.split(" ")[1];
+    var _o;
+    const token = (_o = req.headers.authorization) === null || _o === void 0 ? void 0 : _o.split(" ")[1];
     const payload = (0, jwt_1.decryptToken)(token);
     const mySelf = payload.user._id;
     try {
@@ -360,8 +378,8 @@ const getMyFriends = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.getMyFriends = getMyFriends;
 const getFriendsRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _o;
-    const token = (_o = req.headers.authorization) === null || _o === void 0 ? void 0 : _o.split(" ")[1];
+    var _p;
+    const token = (_p = req.headers.authorization) === null || _p === void 0 ? void 0 : _p.split(" ")[1];
     const payload = (0, jwt_1.decryptToken)(token);
     const mySelf = payload.user._id;
     try {
@@ -374,8 +392,8 @@ const getFriendsRequest = (req, res) => __awaiter(void 0, void 0, void 0, functi
 });
 exports.getFriendsRequest = getFriendsRequest;
 const getFriendsPublications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _p;
-    const token = (_p = req.headers.authorization) === null || _p === void 0 ? void 0 : _p.split(" ")[1];
+    var _q;
+    const token = (_q = req.headers.authorization) === null || _q === void 0 ? void 0 : _q.split(" ")[1];
     const payload = (0, jwt_1.decryptToken)(token);
     const mySelf = payload.user._id;
     try {
@@ -402,3 +420,103 @@ const getFriends = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.getFriends = getFriends;
+const makeComment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _r;
+    const { publicationId } = req.params;
+    const token = (_r = req.headers.authorization) === null || _r === void 0 ? void 0 : _r.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
+    const { title, content, images } = req.body;
+    try {
+        const existingPublication = yield publication_1.default.findById(publicationId);
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
+        const newComment = yield publication_1.default.create({
+            title,
+            content,
+            owner: payload.user._id,
+            images: images ? images : [],
+            isComment: true,
+            commentTo: publicationId,
+        });
+        newComment.save();
+        const publication = yield publication_1.default.findByIdAndUpdate(publicationId, { $inc: { comments: +1 } });
+        return res.status(201).json({ message: "Comment created", newComment });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.makeComment = makeComment;
+const getComments = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { publicationId } = req.params;
+    try {
+        const comments = yield publication_1.default.find({ commentTo: publicationId }).populate("owner").exec();
+        return res.status(200).json({ message: "Comments find", comments });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.getComments = getComments;
+const editComment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _s;
+    const { publicationId } = req.params;
+    const token = (_s = req.headers.authorization) === null || _s === void 0 ? void 0 : _s.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
+    const { title, content, images } = req.body;
+    try {
+        const existingPublication = yield publication_1.default.findById(publicationId);
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
+        if (existingPublication.owner !== payload.user._id) {
+            return res.status(401).json({ message: "You are not the owner of this publication" });
+        }
+        const editedPublication = yield publication_1.default.findByIdAndUpdate(publicationId, {
+            title,
+            content,
+            images,
+            isEdited: true,
+        });
+        return res.status(200).json({ message: "Publication edited", editedPublication });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.editComment = editComment;
+const deleteComment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _t;
+    const { commentId } = req.params;
+    const token = (_t = req.headers.authorization) === null || _t === void 0 ? void 0 : _t.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
+    try {
+        const existingPublication = yield publication_1.default.findById(commentId);
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
+        if (existingPublication.owner !== payload.user._id) {
+            return res.status(401).json({ message: "You are not the owner of this publication" });
+        }
+        if (existingPublication.isComment === false) {
+            return res.status(401).json({ message: "This publication is not a comment" });
+        }
+        const originalPublication = yield publication_1.default.findById(existingPublication.commentTo);
+        if (!originalPublication) {
+            return res.status(404).json({ message: "Original publication not found" });
+        }
+        originalPublication.comments--;
+        yield originalPublication.save();
+        yield publication_1.default.findByIdAndDelete(commentId);
+        yield like_1.default.deleteMany({ commentId });
+        yield bookMark_1.default.deleteMany({
+            commentId,
+        });
+        return res.status(200).json({ message: "Publication deleted" });
+    }
+    catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+});
+exports.deleteComment = deleteComment;

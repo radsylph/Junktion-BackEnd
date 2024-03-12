@@ -12,9 +12,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.changePassword = exports.getUser = exports.deleteUser = exports.EditUser = exports.loginUser = exports.createUser = void 0;
+exports.getAnotherUser = exports.changePassword = exports.getUser = exports.deleteUser = exports.EditUser = exports.loginUser = exports.createUser = void 0;
 const passport_1 = __importDefault(require("../configs/passport"));
 const user_1 = __importDefault(require("../models/user"));
+const friend_1 = __importDefault(require("../models/friend"));
+const friendRequest_1 = __importDefault(require("../models/friendRequest"));
 const jwt_1 = require("../utils/jwt");
 const createUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     yield passport_1.default.authenticate("signup", (err, user, info) => {
@@ -168,3 +170,43 @@ const getUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.getUser = getUser;
+const getAnotherUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _e;
+    const token = (_e = req.headers.authorization) === null || _e === void 0 ? void 0 : _e.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
+    const id = payload.user._id;
+    const { userId } = req.params;
+    try {
+        let statusUser = '';
+        const user = yield user_1.default.findById(userId).exec();
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const status = yield friend_1.default.findOne({ mySelf: id, myFriend: userId }).exec();
+        if (status) {
+            statusUser = "friend";
+        }
+        else {
+            const request = yield friendRequest_1.default.findOne({ sender: id, receiver: userId }).exec();
+            if (request) {
+                statusUser = "requestSent";
+            }
+            else {
+                const request2 = yield friendRequest_1.default.findOne({ sender: userId, receiver: id }).exec();
+                if (request2) {
+                    statusUser = "requestReceived";
+                }
+                else {
+                    statusUser = "noFriend";
+                }
+            }
+        }
+        return res.json({ message: "User found", user, status: statusUser });
+    }
+    catch (error) {
+        return res
+            .status(500)
+            .json({ message: "Internal server error", error: error });
+    }
+});
+exports.getAnotherUser = getAnotherUser;
