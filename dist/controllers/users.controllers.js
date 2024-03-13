@@ -12,12 +12,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAnotherUser = exports.changePassword = exports.getUser = exports.deleteUser = exports.EditUser = exports.loginUser = exports.createUser = void 0;
+exports.getAllUsers = exports.getAnotherUser = exports.changePassword = exports.getUser = exports.deleteUser = exports.EditUser = exports.loginUser = exports.createUser = void 0;
 const passport_1 = __importDefault(require("../configs/passport"));
 const user_1 = __importDefault(require("../models/user"));
 const friend_1 = __importDefault(require("../models/friend"));
 const friendRequest_1 = __importDefault(require("../models/friendRequest"));
+const publication_1 = __importDefault(require("../models/publication"));
+const like_1 = __importDefault(require("../models/like"));
 const jwt_1 = require("../utils/jwt");
+const bookMark_1 = __importDefault(require("../models/bookMark"));
 const createUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     yield passport_1.default.authenticate("signup", (err, user, info) => {
         if (err) {
@@ -66,6 +69,29 @@ const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
+        const userLikes = yield like_1.default.find({ userId: user._id }).exec();
+        yield Promise.all(userLikes.map((like) => __awaiter(void 0, void 0, void 0, function* () {
+            yield publication_1.default.findByIdAndUpdate(like.publicationId, {
+                $inc: { likes: -1 },
+            }).exec();
+            yield like_1.default.findByIdAndDelete(like._id).exec();
+        })));
+        const userFriends = yield friend_1.default.find({ mySelf: user._id }).exec();
+        yield Promise.all(userFriends.map((friend) => __awaiter(void 0, void 0, void 0, function* () {
+            yield user_1.default.findByIdAndUpdate(friend.myFriend, {
+                $inc: { friends: -1 },
+            }).exec();
+            const friends1 = yield friend_1.default.find({ mySelf: user._id, myFriend: friend.myFriend }).exec();
+            yield Promise.all(friends1.map((friend) => friend_1.default.findByIdAndDelete(friend._id).exec()));
+            const friends2 = yield friend_1.default.find({ mySelf: friend.myFriend, myFriend: user._id }).exec();
+            yield Promise.all(friends2.map((friend) => friend_1.default.findByIdAndDelete(friend._id).exec()));
+        })));
+        const userPublications = yield publication_1.default.find({ owner: user._id }).exec();
+        yield Promise.all(userPublications.map((publication) => __awaiter(void 0, void 0, void 0, function* () {
+            yield like_1.default.deleteMany({ publication: publication._id }).exec();
+            yield bookMark_1.default.deleteMany({ publication: publication._id }).exec();
+            yield publication_1.default.findByIdAndDelete(publication._id).exec();
+        })));
         yield user_1.default.findByIdAndDelete(payload.user._id).exec();
         return res.json({ message: "User deleted", user });
     }
@@ -210,3 +236,22 @@ const getAnotherUser = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.getAnotherUser = getAnotherUser;
+const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _f;
+    const token = (_f = req.headers.authorization) === null || _f === void 0 ? void 0 : _f.split(" ")[1];
+    const payload = (0, jwt_1.decryptToken)(token);
+    const id = payload.user._id;
+    try {
+        const users = yield user_1.default.find().exec();
+        if (!users) {
+            return res.status(404).json({ message: "Users not found" });
+        }
+        return res.json({ message: "Users found", users });
+    }
+    catch (error) {
+        return res
+            .status(500)
+            .json({ message: "Internal server error", error: error });
+    }
+});
+exports.getAllUsers = getAllUsers;
