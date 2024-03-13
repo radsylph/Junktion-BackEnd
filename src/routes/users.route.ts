@@ -6,6 +6,8 @@ import {
     deleteUser,
     changePassword,
     getUser,
+    getAnotherUser,
+    getAllUsers
 } from "../controllers/users.controllers";
 import passport from "passport";
 
@@ -13,7 +15,7 @@ const router = express.Router();
 
 router.post("/create", createUser);
 router.post("/login", loginUser);
-
+router.get("/getAll", passport.authenticate("jwt", { session: false }), getAllUsers);
 router.put("/edit", passport.authenticate("jwt", { session: false }), EditUser);
 router.delete(
     "/delete",
@@ -25,5 +27,8 @@ router.get(
     passport.authenticate("jwt", { session: false }),
     getUser
 );
+
+router.get("/getUser/:userId", getAnotherUser);
 router.patch("/changePassword", passport.authenticate("jwt", { session: false }), changePassword);
+
 export default router;
