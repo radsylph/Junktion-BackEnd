@@ -27,7 +27,7 @@ const createPublication = async (req: Request, res: Response) => {
 };
 const getPublications = async (req: Request, res: Response) => {
     try {
-        const publications = await Publication.find().populate("owner").exec();
+        const publications = await Publication.find({ isComment: false }).populate("owner").exec();
         return res.status(200).json({ message: "Publications find", publications });
     } catch (error) {
         return res.status(500).json({ message: "Internal server error", error });
@@ -198,6 +198,15 @@ const deletePublication = async (req: Request, res: Response) => {
         if (existingPublication.owner !== payload.user._id) {
             return res.status(401).json({ message: "You are not the owner of this publication" })
         }
+        const comments = await Publication.find({ commentTo: publicationId });
+        if (comments) {
+            comments.forEach(async (comment) => {
+                await Like.deleteMany
+                    ({ commentId: comment._id });
+                await BookMark.deleteMany({ commentId: comment._id });
+                await Publication.findByIdAndDelete(comment._id);
+            });
+        }
         await Like.deleteMany({ publicationId });
         await BookMark.deleteMany({ publicationId });
         await Publication.findByIdAndDelete(publicationId);
@@ -250,13 +259,11 @@ const acceptFriendRequest = async (req: Request, res: Response) => {
         if (!existingFriendRequest) {
             return res.status(404).json({ message: "Friend request not found" });
         }
-        const friend = await Friend.create({ mySelf: receiver, myFriend: sender });
-        friend.save();
+        const friend = (await Friend.create({ mySelf: receiver, myFriend: sender })).save();
+        const friend2 = (await Friend.create({ mySelf: sender, myFriend: receiver })).save();
         const friendRequest = await FriendRequest.findByIdAndDelete(existingFriendRequest._id);
-        const updateFriends1 = await User.findByIdAndUpdate(sender, { $inc: { myFriends: +1 } });
-        const updateFriends2 = await User.findByIdAndUpdate(receiver, { $inc: { myFriends: +1 } });
-        updateFriends1.save();
-        updateFriends2.save();
+        const updateFriends1 = (await User.findByIdAndUpdate(sender, { $inc: { myFriends: +1 } })).save();
+        const updateFriends2 = (await User.findByIdAndUpdate(receiver, { $inc: { myFriends: +1 } })).save();
         return res.status(200).json({ message: "Friend request accepted", friendRequest });
     } catch (error) {
         return res.status(500).json({ message: "Internal server error", error });
@@ -279,13 +286,25 @@ const rejectFriendRequest = async (req: Request, res: Response) => {
     }
 }
 const deleteFriend = async (req: Request, res: Response) => {
-    const { friendId } = req.params;
+    const { myFriend } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    const mySelf = payload.user._id;
     try {
-        const existingFriend = await Friend.findByIdAndDelete(friendId);
-        if (!existingFriend) {
+        const existingFriend1: any = await Friend.findOne({ mySelf, myFriend });
+        const existingFriend2: any = await Friend.findOne({ mySelf: myFriend, myFriend: mySelf });
+        if (!existingFriend1 || !existingFriend2) {
             return res.status(404).json({ message: "Friend not found" });
         }
-        return res.status(200).json({ message: "Friend deleted", existingFriend });
+        const updateFriends1 = await User.findByIdAndUpdate(mySelf, { $inc: { myFriends: -1 } });
+        const updateFriends2 = await User.findByIdAndUpdate(myFriend, { $inc: { myFriends: -1 } });
+        if (!updateFriends1 || !updateFriends2) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const deletedFriendship1 = await Friend.findByIdAndDelete(existingFriend1._id);
+        const deletedFriendship2 = await Friend.findByIdAndDelete(existingFriend2._id);
+
+        return res.status(200).json({ message: "FriendShip deleted", });
     } catch (error) {
         return res.status(500).json({ message: "Internal server error", error });
     }
@@ -338,6 +357,99 @@ const getFriends = async (req: Request, res: Response) => {
     }
 
 }
+const makeComment = async (req: Request, res: Response) => {
+    const { publicationId } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    const { title, content, images } = req.body;
+    try {
+        const existingPublication = await Publication.findById(publicationId);
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
+        const newComment = await Publication.create({
+            title,
+            content,
+            owner: payload.user._id,
+            images: images ? images : [],
+            isComment: true,
+            commentTo: publicationId,
+        })
+        newComment.save();
+        const publication = await Publication.findByIdAndUpdate(publicationId, { $inc: { comments: +1 } });
+        return res.status(201).json({ message: "Comment created", newComment });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const getComments = async (req: Request, res: Response) => {
+    const { publicationId } = req.params;
+    try {
+        const comments = await Publication.find({ commentTo: publicationId }).populate("owner").exec();
+        return res.status(200).json({ message: "Comments find", comments });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const editComment = async (req: Request, res: Response) => {
+    const { publicationId } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    const { title, content, images } = req.body;
+    try {
+        const existingPublication = await Publication.findById(publicationId);
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
+        if (existingPublication.owner !== payload.user._id) {
+            return res.status(401).json({ message: "You are not the owner of this publication" })
+        }
+        const editedPublication = await Publication.findByIdAndUpdate(publicationId, {
+            title,
+            content,
+            images,
+            isEdited: true,
+        });
+        return res.status(200).json({ message: "Publication edited", editedPublication });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
+const deleteComment = async (req: Request, res: Response) => {
+    const { commentId } = req.params;
+    const token = req.headers.authorization?.split(" ")[1];
+    const payload: any = decryptToken(token);
+    try {
+        const existingPublication = await Publication.findById(commentId);
+        if (!existingPublication) {
+            return res.status(404).json({ message: "Publication not found" });
+        }
+        if (existingPublication.owner !== payload.user._id) {
+            return res.status(401).json({ message: "You are not the owner of this publication" })
+        }
+        if (existingPublication.isComment === false) {
+            return res.status(401).json({ message: "This publication is not a comment" })
+
+        }
+        const originalPublication = await Publication.findById(existingPublication.commentTo);
+        if (!originalPublication) {
+            return res.status(404).json({ message: "Original publication not found" });
+        }
+        originalPublication.comments--;
+        await originalPublication.save();
+        await Publication.findByIdAndDelete(commentId);
+        await Like.deleteMany({ commentId });
+        await BookMark.deleteMany({
+            commentId,
+        });
+        return res.status(200).json({ message: "Publication deleted" });
+    } catch (error) {
+        return res.status(500).json({ message: "Internal server error", error });
+    }
+}
 
 
-export { createPublication, getPublications, likePublication, editPublication, deletePublication, getUserPublications, getLikes, getLikesPublication, bookMarkPublication, getBookMarks, getBookMarksPublication, getMyBookMarks, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, deleteFriend, getFriendsRequest, getMyFriends, getFriendsPublications, getPublication, getFriends }
+
+
+
+export { createPublication, getPublications, likePublication, editPublication, deletePublication, getUserPublications, getLikes, getLikesPublication, bookMarkPublication, getBookMarks, getBookMarksPublication, getMyBookMarks, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, deleteFriend, getFriendsRequest, getMyFriends, getFriendsPublications, getPublication, getFriends, makeComment, getComments, editComment, deleteComment }
